@@ -1,0 +1,4 @@
+Available channels:
+ - 14
+ - 10
+ - 8
