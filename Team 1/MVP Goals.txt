@@ -1,0 +1,28 @@
+MVP Goals:
+ - Z-Move power scaling
+ - 
+
+MVP +1 Goals:
+ - Global position tracking
+
+MVP +2 Goals:
+ - Speech recognition
+
+Pokemon:
+ - Venusaur
+ - Charizard
+ - Blastoise
+ - Raichu
+ - Nidoking
+ - Alakazam
+ - Machamp
+ - Golem
+ - Electrode
+ - Gengar
+ - Muk
+ - Weezing
+ - Scyther
+ - Lapras
+ - Snorlax
+ - Dragonite
+ - Mew (Super rare!!!)
