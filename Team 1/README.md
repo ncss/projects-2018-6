@@ -4,7 +4,7 @@
  - Pokemon battle music (8-bit chiptune style on a micro:bit)
 
 ### MVP +1 Goals:
- - Global position tracking
+ - Global position tracking (A.K.A Z-Moves)
  - Spectator screen
  - Sound effects
 
@@ -34,3 +34,12 @@
  - Lapras
  - Dragonite
  - Mew (Super rare (10^-9 chance)
+
+# TODO:
+ - Network handling +state machine (packet overflow etc)
+ - Music
+ - Textures
+ - Battle Simulation module
+ - Battle/Pokemon classes
+ - Z-Moves (URGENT AND THE MOST IMPORTANT)
+ - Speech recognition (ALSO URGENT, TEH SECOND MOST IMPOERANT)
