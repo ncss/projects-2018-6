@@ -34,3 +34,12 @@
  - Lapras
  - Dragonite
  - Mew (Super rare (10^-9 chance)
+
+# TODO:
+ - Network handling +state machine (packet overflow etc)
+ - Music
+ - Textures
+ - Battle Simulation module
+ - Battle/Pokemon classes
+ - Z-Moves (URGENT AND THE MOST IMPORTANT)
+ - Speech recognition (ALSO URGENT, TEH SECOND MOST IMPOERANT)
