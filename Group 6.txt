@@ -3,3 +3,4 @@ Hey everyone! This file is for our git tutorial!
 Add your name below, commit it, then merge.
 
 Emma Krantz
+Mitchell Bagot
