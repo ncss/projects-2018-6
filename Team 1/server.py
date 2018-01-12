@@ -1,7 +1,6 @@
 from microbit import *
 import radio
 
-
 # 8 is client1 dedicated, 10 is client2 dedicated, 14 is everything else
 channels = [8, 10, 14]
 
@@ -33,6 +32,10 @@ class Client:
         radio.config(channel=self.channel)
         radio.send(message)
 
+    def recv_message(self):
+        radio.config(channel=self.channel)
+        return radio.receive()
+
 def poll_clients():
     '''
     Poll for incoming connections from clients
@@ -58,24 +61,42 @@ def poll_clients():
         for client in connected_clients:
             client.send_message('server_ready')
 
+def client_setup():
+    '''
+    Poll for setup data from the clients
+    '''
+    for client in connected_clients:
+        msg = client.recv_message()
+        if msg:
+            pass
+
 while True:
-    if state == POLL_CLIENTS:
-        poll_clients()
+    state_actions = {
+                     POLL_CLIENTS : poll_clients,
+                     CLIENT_SETUP : client_setup,
 
-    elif state == CLIENT_SETUP:
-        pass
+                     RESET : reset
+                    }
+    # Run the corresponding function for the current state
+    state_actions[state]()
 
-    elif state == POLL_BATTLE:
-        pass
-
-    elif state == RUN_BATTLE:
-        pass
-
-    elif state == TRANSFER_BATTLE:
-        pass
-
-    elif state == GAME_FINISH:
-        pass
-
-    elif state == RESET:
-        reset()
+    # if state == POLL_CLIENTS:
+    #     poll_clients()
+    #
+    # elif state == CLIENT_SETUP:
+    #     client_setup()
+    #
+    # elif state == POLL_BATTLE:
+    #     pass
+    #
+    # elif state == RUN_BATTLE:
+    #     pass
+    #
+    # elif state == TRANSFER_BATTLE:
+    #     pass
+    #
+    # elif state == GAME_FINISH:
+    #     pass
+    #
+    # elif state == RESET:
+    #     reset()
