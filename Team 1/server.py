@@ -9,6 +9,9 @@ radio.config(length=251)
 
 connected_clients = []
 
+# TODO Replace this
+pokemans = ['venusaur']
+
 # Setup states
 POLL_CLIENTS = 0 # Connect the clients to the server
 CLIENT_SETUP = 1 # Choose pokemon
@@ -65,10 +68,25 @@ def client_setup():
     '''
     Poll for setup data from the clients
     '''
-    for client in connected_clients:
+    if all([bool(client.pokemon) for client in connected_clients]):
+        state = POLL_BATTLE
+        for client in connected_clients:
+            client.send_message('start_battle')
+        return
+
+    for c, client in enumerate(connected_clients):
         msg = client.recv_message()
-        if msg:
-            pass
+        if msg and '|' in msg:
+            if client.pokemon:
+                client.send_message('confirm')
+                continue
+
+            pokemon = [pokemans[int(i)] for i in msg.split('|')]
+            connected_clients[c].pokemon = pokemon
+            client.send_message('confirm')
+
+def poll_battle():
+    pass
 
 while True:
     state_actions = {
