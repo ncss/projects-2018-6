@@ -64,6 +64,7 @@ def choose_pokemon():
     start = running_time()
     while True:
         if selection < 2:
+            # Display is 128 x 64
             # button.a = A button
             # button.d = B button
             # button.b = C button
@@ -108,7 +109,6 @@ def choose_pokemon():
 
             return CHOOSE_MOVE
 
-        # Display is 128 x 64
         display.show()
 
         if running_time()-start < 33:
@@ -116,6 +116,7 @@ def choose_pokemon():
     return CHOOSE_POKEMON
 
 def choose_move():
+    # TODO get the actual move list
     moves = ['move1', 'move2', 'move3']
 
     move_selector = 0
@@ -123,29 +124,69 @@ def choose_move():
     while True:
         display.fill(1)
 
+        # Iterate the possible moves, and draw them
+        # Also draw an indicator of the current selection
         for l, line in enumerate(moves):
             y = 10+18*l
             display.text('>'*int(l == move_selector)+' '+line, 20, y, 0)
 
         display.show()
 
+        # If the A button is pressed, iterate the selector
+        # If the C button is pressed, make the selection
         if buttons.a.was_pressed():
             move_selector = (move_selector+1)%len(moves)
         if buttons.b.was_pressed():
-            # TODO Send the move to the server
-            
-            break
-
-    return READ_ZMOVE
+            # TODO store the move choice somewhere
+            return READ_ZMOVE
 
 def read_zmove():
-    pass
+    # TODO get the quality of the z-move in range 1-10
+    quality = 5
+
+    return TRANSFER_BATTLE
 
 def transfer_battle():
-    pass
+    # Part 1, send the info
+    # TODO send the move to the server
+    message = ''
+    msg = radio.receive()
+    last_attempt_time = running_time()-500
+
+    while msg != "confirm":
+        if running_time()-last_attempt_time > 500:
+            last_attempt_time = running_time()
+            # TODO Send the required information about the turn to the server
+            radio.send('action:'+message)
+
+        msg = radio.receive()
+
+    # Part 2, receive the results back and send a confirmation
+    msg = radio.receive()
+    while not msg or not msg.startswith('action:'):
+        msg = radio.receive()
+    # TODO Store the turn information messages, then send confirmation
+
+    radio.send('confirm')
+
+    # TODO determine if the game is over or not
+    # Set state as necessary
+    return DISPLAY_TURN
 
 def display_turn():
-    pass
+    # TODO display the battle actions however we want to
+
+    return CHOOSE_MOVE
 
 def result_screen():
-    pass
+    # TODO get the actual result
+    result = "You Won!"
+
+    while not buttons.c.was_pressed():
+        display.fill(1)
+
+        display.text(result, (128-8*len(result))//2, 28, 0)
+
+        display.show()
+
+    return RESET
