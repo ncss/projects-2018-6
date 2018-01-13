@@ -1,6 +1,8 @@
 from quokka import *
 
 from BattleStuff import *
+from math import ceil
+import random
 
 pokemon_list = pokemans
 
@@ -14,6 +16,9 @@ class Client:
         self.last_attempt_time = 0
 
     def send_msg(self, msg):
+        s = random.randint(10, 100)
+        sleep(s)
+        print("Sending {} with delay {}".format(msg, s))
         radio.send("{}:{}".format(self.id, msg))
 
     def get_pokemon(self):
@@ -32,6 +37,7 @@ class Client:
         if client_id != self.id:
             # Message is not for us
             return
+        print("Message appended: {}".format(msg))
         self.messages.append(msg)
 
 
@@ -55,11 +61,13 @@ class ImprovedQuokkaDisplay(QuokkaDisplay):
 image_bytes = open('images.dat', 'rb').read()
 imgs = {
         'venusaur' : image_bytes[:392],
-        'blastoise' : image_bytes[392:392*2],
-        'charizard' : image_bytes[392*2:]
+        'charizard' : image_bytes[392:392*2],
+        'blastoise' : image_bytes[392*2:]
         }
 
 display = ImprovedQuokkaDisplay(display.spi)
+
+unaddressed_msg_queue = []
 
 client = Client()
 
@@ -76,11 +84,27 @@ RESET = 8
 
 state = CALIBRATE
 
+def radio_loop():
+    msg = radio.receive()
+    if msg is not None:
+        if ":" in msg:
+            client_id, msg = msg.split(":", 1)
+            try:
+                client_id = int(client_id)
+            except ValueError:
+                #Non-numeric client ids can be added to the unaddressed queue
+                unaddressed_msg_queue.append("{}:{}".format(client_id, msg))
+            client.handle_receive(client_id, msg)
+        else:
+            unaddressed_msg_queue.append(msg)
+
 def calibrate(unaddressed_msg_queue, client):
     client.last_attempt_time = running_time()
     return CONNECT_SERVER
 
 def connect_to_server(unaddressed_msg_queue, client):
+
+
     # Try and receive an unaddressed message
     if len(unaddressed_msg_queue) == 0:
         msg = None
@@ -93,16 +117,25 @@ def connect_to_server(unaddressed_msg_queue, client):
 
     if msg is not None and ":" in msg:
         status, client_id = msg.split(":", 1)
-        if status == "confirm":
+        if status == "confirm" and client.connected == False:
             client.connected = True
             client.id = int(client_id)
+            # Draw the waiting message
+            display.fill(1)
+            display.text('Waiting for', 20, 22, 0)
+            display.text('server...', 28, 34, 0)
             # Wait for server_ready
             return CONNECT_SERVER
 
     # If this client hasn't connected, attempt to connect every half second
     if not client.connected and running_time()-client.last_attempt_time > 500:
+        display.fill(1)
+        display.text('Connecting...', 12, 22, 0)
+
         client.last_attempt_time = running_time()
         radio.send('connect')
+
+    display.show()
 
     return CONNECT_SERVER
 
@@ -112,12 +145,13 @@ def choose_pokemon(unaddressed_msg_queue, client):
     '''
     global pokemon_list
 
-    pokemon_indices = [0, 0]
+    pokemon_indices = [0]
     selection = 0
 
     start = running_time()
     while True:
-        if selection < 2:
+        radio_loop()
+        if selection < 1:
             # Display is 128 x 64
             # button.a = A button
             # button.d = B button
@@ -132,7 +166,7 @@ def choose_pokemon(unaddressed_msg_queue, client):
 
         # Draw the screen
         display.fill(1)
-        if selection < 2:
+        if selection < 1:
             # Draw pokemon
             display.draw_image(imgs[pokemon_list[pokemon_indices[selection]].name.lower()], [36, 4])
 
@@ -144,6 +178,10 @@ def choose_pokemon(unaddressed_msg_queue, client):
             display.text('Waiting for', 20, 22, 0)
             display.text('server...', 28, 34, 0)
 
+            client.pokemon = [pokemon_list[a] for a in pokemon_indices]
+
+            display.show()
+
             if len(unaddressed_msg_queue) > 0:
                 msg = unaddressed_msg_queue.pop(0)
             else:
@@ -152,8 +190,12 @@ def choose_pokemon(unaddressed_msg_queue, client):
             connected = False
 
             while msg != "start_battle":
-                if msg == "confirm":
-                    connected = True
+                radio_loop()
+
+                msg = client.recv_msg()
+                if msg is not None:
+                    if msg == "confirm":
+                        connected = True
 
                 if not connected and running_time()-last_attempt_time > 500:
                     last_attempt_time = running_time()
@@ -182,7 +224,16 @@ def choose_move(unaddressed_msg_queue, client):
     move_selector = 0
 
     while True:
+        radio_loop()
         display.fill(1)
+
+        if len(unaddressed_msg_queue) > 0:
+            msg = unaddressed_msg_queue.pop(0)
+        else:
+            msg = ""
+
+        if msg == 'GAME_OVER':
+            return RESULT_SCREEN
 
         # Iterate the possible moves, and draw them
         # Also draw an indicator of the current selection
@@ -199,20 +250,32 @@ def choose_move(unaddressed_msg_queue, client):
         if buttons.b.was_pressed():
             # Store the move choice somewhere
             pokemon.moveIndex = move_selector
+
+            display.fill(1)
+
+            # Draw the waiting message
+            display.text('Waiting for', 20, 22, 0)
+            display.text('server...', 28, 34, 0)
+
+            display.show()
+
             return READ_ZMOVE
 
 def read_zmove(unaddressed_msg_queue, client):
     # TODO get the quality of the z-move in range 1-10
+    print('here!!!')
     return TRANSFER_BATTLE
 
 def transfer_battle(unaddressed_msg_queue, client):
     # Part 1, send the info
     # Send the move to the server
-    message = client.get_pokemon().moveIndex.__str__()+'|'+client.get_pokemon().__str__()
+    message = str(client.get_pokemon().moveIndex)+'|'+str(client.get_pokemon())
     msg = client.recv_msg()
     last_attempt_time = running_time()-500
 
     while msg != "confirm":
+        print(msg)
+        radio_loop()
         if running_time()-last_attempt_time > 500:
             last_attempt_time = running_time()
             # Send the required information about the turn to the server
@@ -222,13 +285,35 @@ def transfer_battle(unaddressed_msg_queue, client):
 
     # Part 2, receive the results back and send a confirmation
     msg = client.recv_msg()
-    while not msg and not msg[0].isdigit():
+    while True:
+        radio_loop()
+        print(msg)
+        if msg is None:
+            msg = client.recv_msg()
+            continue
+        hp, messages = msg.split("|", 1)
+        try:
+            hp = int(hp)
+            break
+        except ValueError:
+            continue
         msg = client.recv_msg()
+
+
+    print(msg)
 
     # Store the turn information messages, then send confirmation
     hp, *messages = msg.split('|')
     hp = int(hp)
-    client.send_msg('confirm')
+    msg = ""
+    while msg != "both_confirm":
+        if client.recv_msg() is not None:
+            client.send_msg('confirm')
+        radio_loop()
+        if len(unaddressed_msg_queue) > 0:
+            msg = unaddressed_msg_queue.pop(0)
+        else:
+            msg = ""
 
     client.messages = messages
     client.get_pokemon().hp = hp
@@ -243,17 +328,15 @@ def display_turn(unaddressed_msg_queue, client):
     end_after = False
 
     # Determine if the game is over or not
-    if messages[-1].startswith('game_over'):
-        messages = message[:-1]
+    if client.pokemon[0].hp <= 0:
         end_after = True
-        client.win_status = messages[-1].split('$')[-1]
 
     for message in messages:
         message = [message]
         display.fill(1)
 
         if len(message[0]) > 14:
-            message = [message[0][a:a+14] for a in range(0, len(message), 14)]
+            message = [message[0][a*14:(a+1)*14] for a in range(ceil(len(message)/14))]
 
         for m, msg in enumerate(message):
             # Calculate the coords for the text
@@ -262,6 +345,9 @@ def display_turn(unaddressed_msg_queue, client):
             x = (128-8*len(msg))//2
             display.text(msg, x, y, 0)
 
+        hp  = 'Your HP: '+str(client.pokemon[0].hp)
+        display.text(hp, 64-(4*len(hp)), 40, 0)
+
         display.show()
         sleep(500)
 
@@ -269,7 +355,7 @@ def display_turn(unaddressed_msg_queue, client):
 
 def result_screen(unaddressed_msg_queue, client):
     # get the actual result
-    result = str(client.win_status)
+    result = 'You lost!' if client.pokemon[0].hp < 0 else 'You won!'
 
     while not buttons.c.was_pressed():
         display.fill(1)

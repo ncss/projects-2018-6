@@ -76,7 +76,7 @@ surf = Move ('surf', 95, Types.WATER)
 ice_beam = Move ('ice beam', 95, Types.ICE)
 submission = Move ('submission', 80, Types.FIGHT)
 
-venusaur = Pokemon (0, 'venusaur', Types.GRASS, Types.POISON, 82, 83, 80, 80, [magical_leaf, sludge_bomb, body_slam])
+venusaur = Pokemon (0, 'Venusaur', Types.GRASS, Types.POISON, 82, 83, 80, 80, [magical_leaf, sludge_bomb, body_slam])
 charizard  = Pokemon (1, 'Charizard', Types.FIRE, Types.FLYING, 84, 78, 78, 100, [flamethrower, earthquake, dragon_claw])
 blastoise = Pokemon (2, 'Blastoise', Types.WATER, '', 83, 100, 79, 78, [surf, ice_beam, submission])
 
@@ -96,7 +96,7 @@ def Battle_calc(pokemon1, pokemon2):
 
     messages.append('{} used {}!'.format(poke.name, poke.moves[poke.moveIndex]))
     if poke2.hp <= 0:
-      messages.append('{} fainted!'.format(poke2.name))
+      messages.append('game_over')
       pokemon[1-p].fainted = True
       break
 
@@ -107,7 +107,8 @@ def Damage_calc(atk_pokemon, def_pokemon, move):
   damage = damage / 1.5
   damage = damage - def_pokemon.defence
   damage = damage * mapp[def_pokemon.type1.ID][move.types.ID]
-  damage = damage * mapp[def_pokemon.type2.ID][move.types.ID]
+  if def_pokemon.type2:
+      damage = damage * mapp[def_pokemon.type2.ID][move.types.ID]
 
   return int(damage)
 

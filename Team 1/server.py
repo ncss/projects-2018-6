@@ -177,7 +177,7 @@ def transfer_battle():
         if not client.message_buffer:
             continue
         # Check for game over
-        if not game_over and 'game_over' in message_buffer:
+        if not game_over and 'game_over' in client.message_buffer:
             game_over = True
 
         client.send_message(client.message_buffer)

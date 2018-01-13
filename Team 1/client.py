@@ -5,9 +5,7 @@ from client_states import *
 CHANNEL = 14
 
 radio.enable()
-radio.config(channel=CHANNEL)
-
-unaddressed_msg_queue = []
+radio.config(channel=CHANNEL, power=7)
 
 def setState(newState):
     global state
@@ -33,17 +31,6 @@ while True:
         last_print = running_time()
         print(state, unaddressed_msg_queue, client.messages)
 
-    msg = radio.receive()
-    if msg is not None:
-        if ":" in msg:
-            client_id, msg = msg.split(":", 1)
-            try:
-                client_id = int(client_id)
-            except ValueError:
-                #Non-numeric client ids can be added to the unaddressed queue
-                unaddressed_msg_queue.append("{}:{}".format(client_id, msg))
-            client.handle_receive(client_id, msg)
-        else:
-            unaddressed_msg_queue.append(msg)
+    radio_loop()
 
     setState(state_actions[state](unaddressed_msg_queue, client))

@@ -1,6 +1,7 @@
 # https://github.com/micropython/micropython/blob/master/drivers/display/ssd1306.py
 
 from micropython import const
+import pyb
 import framebuf
 
 SET_CONTRAST        = const(0x81)
@@ -86,6 +87,7 @@ class SSD1306(framebuf.FrameBuffer):
         self.write_cmd(0)
         self.write_cmd(self.pages - 1)
         self.write_data(self.buffer)
+        pyb.delay(10)
 
 
 class SSD1306_I2C(SSD1306):

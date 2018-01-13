@@ -151,7 +151,7 @@ class QuokkaRadio:
             self.slave_select.value(0)
             resp = self.spi.read(1, 0x00)[0]
 
-        data = bytearray(64)
+        data = bytearray(256)
         self.spi.readinto(data, 0x00)
         self.slave_select.value(1)
 
