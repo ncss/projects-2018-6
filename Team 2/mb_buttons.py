@@ -4,13 +4,13 @@ import radio
 SIDE_LENGTH = 2
 PREFIX = "btn:"
 OUT_PINS = [pin0, pin1]
-IN_PINS = [pin2, pin3]
+IN_PINS = [pin3, pin4]
 
 buttons = [[False] * SIDE_LENGTH for _ in range(SIDE_LENGTH)]
 
 display.off()
-radio.on()
-radio.config(channel=6)
+#radio.on()
+#radio.config(channel=6)
 
 def init():
 	# Set output pins to high initially
@@ -32,10 +32,10 @@ while True:
 			# Check if any buttons have changed states
 			if buttons[i][j] != row_states[j]:
 				msg = PREFIX + str(i) + "," + str(j)
-				radio.send(msg)
+				#radio.send(msg)
 				print(msg)
 
-			buttons[i] = row_states
+		buttons[i] = row_states
 
 		# Set pin back to high after scanning
 		out_pin.write_digital(1)
