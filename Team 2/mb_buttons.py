@@ -2,8 +2,8 @@ from microbit import *
 import radio
 
 SIDE_LENGTH = 2
-PREFIX = "btn:"
-OUT_PINS = [pin0, pin1]
+PREFIX = "tw:btn:"
+OUT_PINS = [pin1, pin0]
 IN_PINS = [pin2, pin8]
 
 buttons = [[False] * SIDE_LENGTH for _ in range(SIDE_LENGTH)]
@@ -34,7 +34,11 @@ while True:
 
 			# Check if any buttons have changed states
 			if buttons[i][j] != row_states[j]:
-				msg = PREFIX + str(i) + "," + str(j)
+				msg = PREFIX
+				buttons[i] = row_states
+				for row in buttons:
+					msg += "".join([("1" if btn == False else "") for btn in row])
+					msg += ";"
 				#radio.send(msg)
 				print(msg)
 
