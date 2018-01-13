@@ -37,7 +37,7 @@ while True:
 				msg = PREFIX
 				buttons[i] = row_states
 				for row in buttons:
-					msg += "".join([("1" if btn == False else "") for btn in row])
+					msg += "".join([("1," if btn == False else ",") for btn in row])
 					msg += ";"
 				#radio.send(msg)
 				print(msg)
