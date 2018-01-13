@@ -1,15 +1,15 @@
 from microbit import *
 import radio
 
-SIDE_LENGTH = 3
+SIDE_LENGTH = 4
 PREFIX = "tw:btn:"
-IN_PINS = [pin0, pin1, pin2]#, pin10]
-OUT_PINS = [pin13, pin14, pin15]#, pin16]
+IN_PINS = [pin0, pin1, pin2, pin4]
+OUT_PINS = [pin13, pin14, pin15, pin16]
 TOLERANCE = 800
 
 buttons = [[False] * SIDE_LENGTH for _ in range(SIDE_LENGTH)]
 
-#display.off()
+display.off()
 radio.on()
 radio.config(channel=6)
 
@@ -47,9 +47,9 @@ while True:
 		out_pin.write_digital(1)
 
 	# Show button states on LED matrix
-	for i in range(len(buttons)):
-		for j in range(len(buttons[i])):
-			display.set_pixel(i, j, (9 if buttons[i][j] else 0))
+	#for i in range(len(buttons)):
+	#	for j in range(len(buttons[i])):
+	#		display.set_pixel(i, j, (9 if buttons[i][j] else 0))
 	#sleep(100)
 
 	# Send button states
