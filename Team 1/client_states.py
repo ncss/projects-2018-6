@@ -1,18 +1,49 @@
 from quokka import *
-from pokemon_img import venusaur
-from improved_display import *
 
-# TODO Dummy list
-pokemon_list = ['venusaur']
-# venusaur = venusaur.split('\n')
-# venusaur_buffer = SpecialFrameBuffer(bytearray(392), 56, 56, framebuf.MONO_VLSB)
-# venusaur_buffer.draw_image(venusaur, [0, 0])
+from BattleStuff import *
 
+pokemon_list = pokemans
+
+class Client:
+    def __init__(self):
+        self.pokemon = []
+        self.win_status = None
+        self.messages = []
+
+    def get_pokemon(self):
+        for pokemon in self.pokemon:
+            if not pokemon.fainted:
+                return pokemon
+        self.win_status = 'You lost!'
+        return self.pokemon[0]
+
+class ImprovedQuokkaDisplay(QuokkaDisplay):
+    def __init__(self, spi):
+        super().__init__(spi)
+
+    def draw_image(self, image, pos):
+        '''
+        Draw a 2D array of pixel values to the screen
+        '''
+        for y in range(56):
+            for x in range(7):
+                try:
+                    byte = image[y*7 + x]
+                except IndexError:
+                    print(y*7+x)
+                for bit in range(8):
+                    self.pixel(pos[0]+x*8+bit, pos[1]+y, (byte & (1 << (7-bit))) >> (7-bit))
+
+image_bytes = open('images.dat', 'rb').read()
 imgs = {
-        'venusaur' : venusaur.split('\n')
+        'venusaur' : image_bytes[:392],
+        'blastoise' : image_bytes[392:392*2],
+        'charizard' : image_bytes[392*2:]
         }
 
 display = ImprovedQuokkaDisplay(display.spi)
+
+client = Client()
 
 # Initialise the states
 CALIBRATE = 0
@@ -32,8 +63,6 @@ def calibrate():
 
 def connect_to_server():
     msg = radio.receive()
-
-    return CHOOSE_POKEMON
 
     connected = False
     last_attempt_time = running_time()
@@ -80,7 +109,7 @@ def choose_pokemon():
         display.fill(1)
         if selection < 2:
             # Draw pokemon
-            display.draw_image(imgs[pokemon_list[pokemon_indices[selection]]], [36, 4])
+            display.draw_image(imgs[pokemon_list[pokemon_indices[selection]].name.lower()], [36, 4])
 
             # Draw the arrows and push them toward the edges if the button is held
             display.text('<', 10-5*int(buttons.a.is_pressed()), 28, 0)
@@ -89,8 +118,6 @@ def choose_pokemon():
             # Draw the waiting message
             display.text('Waiting for', 20, 22, 0)
             display.text('server...', 28, 34, 0)
-
-            return CHOOSE_MOVE
 
             msg = radio.receive()
             last_attempt_time = running_time()-500
@@ -102,7 +129,7 @@ def choose_pokemon():
 
                 if not connected and running_time()-last_attempt_time > 500:
                     last_attempt_time = running_time()
-                    # TODO Send the required information about the pokemon to the server
+                    # Send the required information about the pokemon to the server
                     radio.send('|'.join([str(a) for a in pokemon_indices]))
 
                 msg = radio.receive()
@@ -116,8 +143,10 @@ def choose_pokemon():
     return CHOOSE_POKEMON
 
 def choose_move():
-    # TODO get the actual move list
-    moves = ['move1', 'move2', 'move3']
+    pokemon = client.get_pokemon()
+    if pokemon is None:
+        return RESULT_SCREEN
+    moves = pokemon.moves
 
     move_selector = 0
 
@@ -126,7 +155,7 @@ def choose_move():
 
         # Iterate the possible moves, and draw them
         # Also draw an indicator of the current selection
-        for l, line in enumerate(moves):
+        for l, line in enumerate([move.name for move in moves]):
             y = 10+18*l
             display.text('>'*int(l == move_selector)+' '+line, 20, y, 0)
 
@@ -137,50 +166,79 @@ def choose_move():
         if buttons.a.was_pressed():
             move_selector = (move_selector+1)%len(moves)
         if buttons.b.was_pressed():
-            # TODO store the move choice somewhere
+            # Store the move choice somewhere
+            pokemon.moveIndex = move_selector
             return READ_ZMOVE
 
 def read_zmove():
     # TODO get the quality of the z-move in range 1-10
-    quality = 5
-
     return TRANSFER_BATTLE
 
 def transfer_battle():
     # Part 1, send the info
-    # TODO send the move to the server
-    message = ''
+    # Send the move to the server
+    message = client.get_pokemon().moveIndex.__str__()+'|'+client.get_pokemon().__str__()
     msg = radio.receive()
     last_attempt_time = running_time()-500
 
     while msg != "confirm":
         if running_time()-last_attempt_time > 500:
             last_attempt_time = running_time()
-            # TODO Send the required information about the turn to the server
+            # Send the required information about the turn to the server
             radio.send('action:'+message)
 
         msg = radio.receive()
 
     # Part 2, receive the results back and send a confirmation
     msg = radio.receive()
-    while not msg or not msg.startswith('action:'):
+    while not msg and not msg[0].isdigit():
         msg = radio.receive()
-    # TODO Store the turn information messages, then send confirmation
 
+    # Store the turn information messages, then send confirmation
+    hp, *messages = msg.split('|')
+    hp = int(hp)
     radio.send('confirm')
 
-    # TODO determine if the game is over or not
+    client.messages = messages
+    client.get_pokemon().hp = hp
+
     # Set state as necessary
     return DISPLAY_TURN
 
 def display_turn():
-    # TODO display the battle actions however we want to
+    # Display the battle actions however we want to
+    # get messages
+    messages = client.messages
+    end_after = False
 
-    return CHOOSE_MOVE
+    # Determine if the game is over or not
+    if messages[-1].startswith('game_over'):
+        messages = message[:-1]
+        end_after = True
+        client.win_status = messages[-1].split('$')[-1]
+
+    for message in messages:
+        message = [message]
+        display.fill(1)
+
+        if len(message[0]) > 14:
+            message = [message[0][a:a+14] for a in range(0, len(message), 14)]
+
+        for m, msg in enumerate(message):
+            # Calculate the coords for the text
+            top_pos = 32-(8+12*(len(message)-1))//2
+            y = top_pos+12*m #12 pixels per row #28 is middle
+            x = (128-8*len(msg))//2
+            display.text(msg, x, y, 0)
+
+        display.show()
+        sleep(500)
+
+    return CHOOSE_MOVE if not end_after else RESULT_SCREEN
 
 def result_screen():
-    # TODO get the actual result
-    result = "You Won!"
+    # get the actual result
+    result = str(client.win_status)
 
     while not buttons.c.was_pressed():
         display.fill(1)

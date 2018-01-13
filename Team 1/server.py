@@ -1,16 +1,13 @@
-from microbit import *
-import radio
+from quokka import *
+
+from BattleStuff import *
 
 # 8 is client1 dedicated, 10 is client2 dedicated, 14 is everything else
 channels = [8, 10, 14]
 
-radio.on()
-radio.config(length=251)
+radio.enable()
 
 connected_clients = []
-
-# TODO Replace this
-pokemans = ['venusaur']
 
 # Setup states
 POLL_CLIENTS = 0 # Connect the clients to the server
@@ -119,13 +116,30 @@ def run_battle():
     '''
     Run a simulation of the current turn of the pokemon battle
     '''
-    # TODO calculate the battle
-    # TODO and store the results in the client message buffer
-    for c, client in enumerate(connected_clients):
-        # TODO process the message data
-        pass
+    pokemon = []
 
-    # TODO get the pokemon data for the battle sim
+    # process the message data
+    for c, client in enumerate(connected_clients):
+        move, id = client.message_buffer.split('|')
+        move = int(move)
+        id = int(id)
+        pokemon.append(get_pokemon_by_id(id))
+        pokemon[-1].moveIndex = move
+
+    # calculate the battle
+    pokemon, messages = Battle_calc(*pokemon)
+
+    # and store the results in the client message buffer
+    for c, client in enumerate(connected_clients):
+        poke = pokemon[c]
+        if messages[-1] == 'game_over':
+            if all([p.fainted for p in client.pokemon]):
+                messages[-1] += '$You lost!'
+            else:
+                messages[-1] += '$You won!'
+        connected_clients[c].message_buffer = '{}|{}'.format(poke.hp, '|'.join(messages))
+
+    # get the pokemon data for the battle sim
     # and store the results back in the message_buffer
     state = TRANSFER_BATTLE
 
@@ -135,9 +149,15 @@ def transfer_battle():
     '''
     global connected_clients
 
+    game_over = False
+
     for c, client in enumerate(connected_clients):
         if not client.message_buffer:
             continue
+        # Check for game over
+        if not game_over and 'game_over' in message_buffer:
+            game_over = True
+
         client.send_message(client.message_buffer)
         msg.client.recv_message()
         # Clear the message buffer upon confirmation of transfer
@@ -149,10 +169,11 @@ def transfer_battle():
     if all([client.message_buffer is None for client in connected_clients]):
         # start the battle simulation
         # If the result is gameover,
-        # state = GAME_FINISH
-
+        if game_over:
+            state = GAME_FINISH
         # otherwise, go back to polling for actions
-        state = POLL_BATTLE
+        else:
+            state = POLL_BATTLE
 
 def game_finish():
     # TODO MVP+1/2 Handle the spectating screen as required here
@@ -166,7 +187,7 @@ while True:
                      RUN_BATTLE : run_battle,
                      TRANSFER_BATTLE : transfer_battle,
                      GAME_FINISH : game_finish,
-                     RESET : reset
+                     RESET : machine.soft_reset
                     }
     # Run the corresponding function for the current state
     state_actions[state]()
