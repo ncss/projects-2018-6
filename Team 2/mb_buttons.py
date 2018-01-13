@@ -4,11 +4,11 @@ import radio
 SIDE_LENGTH = 2
 PREFIX = "btn:"
 OUT_PINS = [pin0, pin1]
-IN_PINS = [pin3, pin4]
+IN_PINS = [pin2, pin8]
 
 buttons = [[False] * SIDE_LENGTH for _ in range(SIDE_LENGTH)]
 
-display.off()
+#display.off()
 #radio.on()
 #radio.config(channel=6)
 
@@ -19,6 +19,9 @@ def init():
 	# Set pullup on input pins
 	for pin in IN_PINS:
 		pin.set_pull(pin.PULL_UP)
+
+def update_display(x, y, b):
+	display.set_pixel(x, y, 9)
 
 while True:
 	for i, out_pin in enumerate(OUT_PINS):
@@ -39,3 +42,8 @@ while True:
 
 		# Set pin back to high after scanning
 		out_pin.write_digital(1)
+
+	# Show button states on LED matrix
+	for i in range(len(buttons)):
+		for j in range(len(buttons[i])):
+			display.set_pixel(i, j, (9 if buttons[i][j] else 0))
