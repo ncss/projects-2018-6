@@ -6,9 +6,15 @@ pokemon_list = pokemans
 
 class Client:
     def __init__(self):
+        self.id = None
         self.pokemon = []
         self.win_status = None
         self.messages = []
+        self.connected = False
+        self.last_attempt_time = 0
+
+    def send_msg(self, msg):
+        radio.send("{}:{}".format(self.id, msg))
 
     def get_pokemon(self):
         for pokemon in self.pokemon:
@@ -16,6 +22,18 @@ class Client:
                 return pokemon
         self.win_status = 'You lost!'
         return self.pokemon[0]
+
+    def recv_msg(self):
+        if len(self.messages) > 0:
+            return self.messages.pop(0)
+        return None
+
+    def handle_receive(self, client_id, msg):
+        if client_id != self.id:
+            # Message is not for us
+            return
+        self.messages.append(msg)
+
 
 class ImprovedQuokkaDisplay(QuokkaDisplay):
     def __init__(self, spi):
@@ -58,30 +76,37 @@ RESET = 8
 
 state = CALIBRATE
 
-def calibrate():
+def calibrate(unaddressed_msg_queue, client):
+    client.last_attempt_time = running_time()
     return CONNECT_SERVER
 
-def connect_to_server():
-    msg = radio.receive()
+def connect_to_server(unaddressed_msg_queue, client):
+    # Try and receive an unaddressed message
+    if len(unaddressed_msg_queue) == 0:
+        msg = None
+    else:
+        msg = unaddressed_msg_queue.pop(0)
 
-    connected = False
-    last_attempt_time = running_time()
+    if client.connected:
+        if msg == "server_ready":
+            return CHOOSE_POKEMON
 
-    # While the server hasn't got all clients connected
-    while msg != "server_ready":
-        if msg == "confirm":
-            connected = True
+    if msg is not None and ":" in msg:
+        status, client_id = msg.split(":", 1)
+        if status == "confirm":
+            client.connected = True
+            client.id = int(client_id)
+            # Wait for server_ready
+            return CONNECT_SERVER
 
-        # If this client hasn't connected, attempt to connect every half second
-        if not connected and running_time()-last_attempt_time > 500:
-            last_attempt_time = running_time()
-            radio.send('connect')
+    # If this client hasn't connected, attempt to connect every half second
+    if not client.connected and running_time()-client.last_attempt_time > 500:
+        client.last_attempt_time = running_time()
+        radio.send('connect')
 
-        msg = radio.receive()
+    return CONNECT_SERVER
 
-    return CHOOSE_POKEMON
-
-def choose_pokemon():
+def choose_pokemon(unaddressed_msg_queue, client):
     '''
     Draw the choose pokemon screen and handle the buttons
     '''
@@ -119,7 +144,10 @@ def choose_pokemon():
             display.text('Waiting for', 20, 22, 0)
             display.text('server...', 28, 34, 0)
 
-            msg = radio.receive()
+            if len(unaddressed_msg_queue) > 0:
+                msg = unaddressed_msg_queue.pop(0)
+            else:
+                msg = ""
             last_attempt_time = running_time()-500
             connected = False
 
@@ -130,9 +158,12 @@ def choose_pokemon():
                 if not connected and running_time()-last_attempt_time > 500:
                     last_attempt_time = running_time()
                     # Send the required information about the pokemon to the server
-                    radio.send('|'.join([str(a) for a in pokemon_indices]))
+                    client.send_msg('|'.join([str(a) for a in pokemon_indices]))
 
-                msg = radio.receive()
+                if len(unaddressed_msg_queue) > 0:
+                    msg = unaddressed_msg_queue.pop(0)
+                else:
+                    msg = ""
 
             return CHOOSE_MOVE
 
@@ -142,7 +173,7 @@ def choose_pokemon():
             sleep(int(33.34-(running_time()-start)))
     return CHOOSE_POKEMON
 
-def choose_move():
+def choose_move(unaddressed_msg_queue, client):
     pokemon = client.get_pokemon()
     if pokemon is None:
         return RESULT_SCREEN
@@ -170,34 +201,34 @@ def choose_move():
             pokemon.moveIndex = move_selector
             return READ_ZMOVE
 
-def read_zmove():
+def read_zmove(unaddressed_msg_queue, client):
     # TODO get the quality of the z-move in range 1-10
     return TRANSFER_BATTLE
 
-def transfer_battle():
+def transfer_battle(unaddressed_msg_queue, client):
     # Part 1, send the info
     # Send the move to the server
     message = client.get_pokemon().moveIndex.__str__()+'|'+client.get_pokemon().__str__()
-    msg = radio.receive()
+    msg = client.recv_msg()
     last_attempt_time = running_time()-500
 
     while msg != "confirm":
         if running_time()-last_attempt_time > 500:
             last_attempt_time = running_time()
             # Send the required information about the turn to the server
-            radio.send('action:'+message)
+            client.send_msg('action:'+message)
 
-        msg = radio.receive()
+        msg = client.recv_msg()
 
     # Part 2, receive the results back and send a confirmation
-    msg = radio.receive()
+    msg = client.recv_msg()
     while not msg and not msg[0].isdigit():
-        msg = radio.receive()
+        msg = client.recv_msg()
 
     # Store the turn information messages, then send confirmation
     hp, *messages = msg.split('|')
     hp = int(hp)
-    radio.send('confirm')
+    client.send_msg('confirm')
 
     client.messages = messages
     client.get_pokemon().hp = hp
@@ -205,7 +236,7 @@ def transfer_battle():
     # Set state as necessary
     return DISPLAY_TURN
 
-def display_turn():
+def display_turn(unaddressed_msg_queue, client):
     # Display the battle actions however we want to
     # get messages
     messages = client.messages
@@ -236,7 +267,7 @@ def display_turn():
 
     return CHOOSE_MOVE if not end_after else RESULT_SCREEN
 
-def result_screen():
+def result_screen(unaddressed_msg_queue, client):
     # get the actual result
     result = str(client.win_status)
 
